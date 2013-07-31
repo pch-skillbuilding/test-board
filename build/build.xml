@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<project xmlns:ac="antlib:net.sf.antcontrib" name="Test-Board" default="build" basedir="../">
+	
+	<property name="build.output.dir" location="buildoutput"/>
+	<property name="build.temp.dir" location="${build.output.dir}/temp"/>
+	<property name="build.report.dir" location="${build.output.dir}/reports"/>
+	<property name="build.release.dir" location="${build.output.dir}/releases"/>
+	
+	<property name="build.dir" location="${basedir}/build"/>
+	<property name="build.conf.dir" location="${build.dir}/conf"/>
+	<property name="build.tools.dir" location="${build.dir}/tools"/>
+	
+	<taskdef resource="net/sf/antcontrib/antcontrib.properties">
+		<classpath>
+			<pathelement location="${build.tools.dir}/ant/lib/ant-contrib-1.0b3.jar"/>
+		</classpath>
+	</taskdef>
+	
+	<target name="clean">
+		<echo message="Cleaning..."/>
+		<delete dir="${build.output.dir}" verbose="true"/>
+	</target>
+	
+	<target name="init" depends="clean">
+		<echo message="Initializing output directories..."/>
+		<mkdir dir="${build.output.dir}"/>
+		<mkdir dir="${build.temp.dir}"/>
+		<mkdir dir="${build.report.dir}"/>
+		<mkdir dir="${build.release.dir}"/>
+	</target>
+	
+	<target name="prepare" depends="init">
+		<echo message="Preparing build output..."/>
+		<copy todir="${build.temp.dir}" verbose="true">
+			<fileset dir="${basedir}">
+				<include name="**/*.*"/>
+				<exclude name="*.sh"/>
+				<exclude name="*.bat"/>
+				<exclude name="build/**/*.*"/>
+				<exclude name="buildoutput/**/*.*"/>
+			</fileset>
+		</copy>
+	</target>
+	
+	<target name="package" depends="prepare">
+		
+		<echo message="Packaging ${application.name} using Version Number ${version.number}"/>
+		<!-- write version number to version.txt -->
+		<echo message="${version.number}" file="${build.temp.dir}/version.txt"/>
+		<!-- iterate the build/conf/[env] directories for each environment specific configuration.properties file -->
+		
+		<ac:for param="configuration.environment">
+			<path>
+				<dirset dir="${build.conf.dir}">
+					<include name="**"/>
+				</dirset>
+			</path>
+			<sequential>
+				<ac:for param="configuration.file">
+					<path>
+						<fileset dir="@{configuration.environment}">
+							<include name="configuration.properties"/>
+						</fileset>
+					</path>
+					<sequential>
+						<!-- execute environment specific packaging for the given environment/configuration file -->
+						<antcall target="package-environment">
+							<param name="environment" value="@{configuration.environment}"/>
+							<param name="environment.configuration.file" value="@{configuration.file}"/>
+						</antcall>
+					</sequential>
+				</ac:for>
+			</sequential>
+		</ac:for>
+	</target>
+	
+	<target name="package-environment">
+		<basename property="environment.name" file="${environment}"/>
+		<if>
+			<!-- skip environment specific packaging for local -->
+			<equals arg1="${environment.name}" arg2="local"/>
+			<then>
+				<echo message="Skipping environment specific packaging for the ${environment.name} environment"/>
+			</then>
+			<else>
+				<echo message="Running environment packaging for ${environment.name} using settings from ${environment.configuration.file}"/>
+				<!-- copy the build/template/configuration.php.template file to the temporary output directory -->
+				<!-- <copy file="${build.templates.dir}/configuration.php.template" toFile="${build.temp.dir}/configuration.php" verbose="true" overwrite="true"/> -->
+				<!-- execute token replacement on configuration.php from the environment specific configuration properties file -->
+				<!-- <replace file="${build.temp.dir}/configuration.php" replacefilterfile="${environment.configuration.file}"/> -->
+				<!-- package the temporary directory into a versioned, environment specific package -->
+				<property name="application.package.name" value="${application.name}-${version.number}"/>
+				<property name="package.dir" value="${build.release.dir}/${application.package.name}"/>
+				<tar destfile="${package.dir}/${application.package.name}-${environment.name}.tar" basedir="${build.temp.dir}"/>
+			</else>
+		</if>
+	</target>
+	
+</project>
